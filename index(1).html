@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Budget" />
+  <title>Weekly Budget</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface2: #222;
+      --border: #2e2e2e;
+      --accent: #c8f04a;
+      --accent-dim: rgba(200,240,74,0.12);
+      --red: #ff5c5c;
+      --red-dim: rgba(255,92,92,0.12);
+      --blue: #5ca8ff;
+      --blue-dim: rgba(92,168,255,0.12);
+      --muted: #555;
+      --text: #e8e8e8;
+      --text-dim: #888;
+      --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      padding-bottom: calc(60px + var(--safe-bottom));
+    }
+    .header {
+      padding: calc(var(--safe-top) + 16px) 20px 16px;
+      background: var(--bg);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .month-nav { display: flex; align-items: center; gap: 12px; }
+    .month-nav button {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .month-label { font-size: 15px; font-weight: 600; min-width: 100px; text-align: center; }
+    .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .summary-item {
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+    }
+    .summary-item .label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-dim); margin-bottom: 4px; }
+    .summary-item .value { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+    .summary-item .value.positive { color: var(--accent); }
+    .summary-item .value.negative { color: var(--red); }
+    .summary-item .value.blue { color: var(--blue); }
+    .content { padding: 16px 16px 0; display: flex; flex-direction: column; gap: 12px; }
+    .week-card {
+      background: var(--surface);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+    .week-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 16px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .week-header:active { background: var(--surface2); }
+    .week-left { display: flex; flex-direction: column; gap: 3px; }
+    .week-title { font-size: 13px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.6px; }
+    .week-date { font-size: 11px; color: var(--muted); }
+    .week-paycheck { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: var(--accent); }
+    .week-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+    .week-remaining-label { font-size: 11px; color: var(--text-dim); }
+    .week-remaining { font-size: 18px; font-weight: 700; letter-spacing: -0.4px; }
+    .week-remaining.ok { color: var(--accent); }
+    .week-remaining.warn { color: #f0a500; }
+    .week-remaining.danger { color: var(--red); }
+    .chevron { color: var(--muted); font-size: 12px; margin-left: 8px; transition: transform 0.2s; }
+    .week-card.open .chevron { transform: rotate(180deg); }
+    .week-body { display: none; border-top: 1px solid var(--border); }
+    .week-card.open .week-body { display: block; }
+    .paycheck-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--accent-dim);
+    }
+    .paycheck-row label { font-size: 13px; color: var(--accent); font-weight: 600; flex: 1; }
+    .paycheck-row input {
+      background: transparent; border: none; color: var(--accent);
+      font-size: 16px; font-weight: 700; text-align: right; width: 120px;
+      outline: none; font-family: var(--font);
+    }
+    .supplemental-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--blue-dim);
+    }
+    .supplemental-row label { font-size: 13px; color: var(--blue); font-weight: 600; flex: 1; }
+    .supplemental-row input {
+      background: transparent; border: none; color: var(--blue);
+      font-size: 14px; font-weight: 700; text-align: right; width: 120px;
+      outline: none; font-family: var(--font);
+    }
+    .buffer-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.02);
+    }
+    .buffer-row label { font-size: 13px; color: var(--text-dim); flex: 1; }
+    .buffer-value { font-size: 14px; font-weight: 600; color: var(--text-dim); }
+    .items-list { padding: 8px 0; }
+    .item-row { display: flex; align-items: center; gap: 10px; padding: 9px 16px; }
+    .item-row:active { background: var(--surface2); }
+    .item-name {
+      flex: 1; font-size: 14px; color: var(--text);
+      background: transparent; border: none; outline: none;
+      font-family: var(--font); min-width: 0;
+    }
+    .item-name::placeholder { color: var(--muted); }
+    .item-type {
+      font-size: 11px; padding: 3px 7px; border-radius: 6px;
+      font-weight: 600; cursor: pointer; border: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .item-type.bill { background: var(--red-dim); color: var(--red); }
+    .item-type.savings { background: var(--accent-dim); color: var(--accent); }
+    .item-type.buffer { background: rgba(255,255,255,0.06); color: var(--text-dim); }
+    .item-amount {
+      width: 90px; background: transparent; border: none;
+      color: var(--text); font-size: 14px; font-weight: 600;
+      text-align: right; outline: none; font-family: var(--font);
+    }
+    .item-amount::placeholder { color: var(--muted); }
+    .delete-btn {
+      background: none; border: none; color: var(--muted);
+      font-size: 18px; cursor: pointer; padding: 0 2px; line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .delete-btn:active { color: var(--red); }
+    .add-row {
+      display: flex; gap: 8px;
+      padding: 10px 16px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .add-btn {
+      flex: 1; padding: 9px; border-radius: 9px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text-dim); font-size: 13px; font-weight: 600;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .add-btn:active { background: var(--border); }
+    .add-btn.savings-btn { color: var(--accent); border-color: rgba(200,240,74,0.3); }
+    .week-totals {
+      padding: 12px 16px; border-top: 1px solid var(--border);
+      display: flex; flex-direction: column; gap: 6px;
+      background: var(--surface2);
+    }
+    .total-row { display: flex; justify-content: space-between; font-size: 13px; }
+    .total-row .tl { color: var(--text-dim); }
+    .total-row .tv { font-weight: 600; }
+    .total-row.main { padding-top: 6px; border-top: 1px solid var(--border); }
+    .total-row.main .tl { color: var(--text); font-weight: 600; font-size: 14px; }
+    .total-row.main .tv { font-size: 14px; }
+    .tv.positive { color: var(--accent); }
+    .tv.negative { color: var(--red); }
+    .tv.ok { color: var(--accent); }
+    .tv.warn { color: #f0a500; }
+    .tv.danger { color: var(--red); }
+    .week-delete-row {
+      padding: 8px 16px 12px;
+      display: flex; justify-content: flex-end;
+    }
+    .week-delete-btn {
+      background: none; border: none; color: var(--muted);
+      font-size: 12px; cursor: pointer; padding: 4px 8px;
+      border-radius: 6px; border: 1px solid var(--border);
+    }
+    .week-delete-btn:active { color: var(--red); border-color: var(--red); }
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--surface); border-top: 1px solid var(--border);
+      padding: 10px 20px calc(var(--safe-bottom) + 10px);
+      display: flex; gap: 10px; z-index: 100;
+    }
+    .nav-btn {
+      flex: 1; padding: 11px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-size: 13px; font-weight: 600;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .nav-btn.primary { background: var(--accent); color: #000; border-color: var(--accent); }
+    .nav-btn:active { opacity: 0.7; }
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 200; display: none; align-items: flex-end;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface); border-radius: 20px 20px 0 0;
+      padding: 20px 20px calc(var(--safe-bottom) + 20px);
+      width: 100%; max-height: 80dvh; overflow-y: auto;
+    }
+    .modal h2 { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+    .modal-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .modal-row label { font-size: 14px; color: var(--text-dim); }
+    .modal-row input {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 7px 10px; color: var(--text);
+      font-size: 14px; font-weight: 600; text-align: right; width: 130px;
+      outline: none; font-family: var(--font);
+    }
+    .modal-close {
+      width: 100%; margin-top: 16px; padding: 13px; border-radius: 12px;
+      background: var(--accent); color: #000; border: none;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+    }
+    .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); padding: 14px 0 6px; }
+    .toast {
+      position: fixed; top: calc(var(--safe-top) + 60px);
+      left: 50%; transform: translateX(-50%) translateY(-10px);
+      background: var(--accent); color: #000;
+      padding: 10px 18px; border-radius: 20px;
+      font-size: 13px; font-weight: 700;
+      opacity: 0; transition: all 0.3s;
+      pointer-events: none; z-index: 300; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .empty-state { text-align: center; padding: 20px; color: var(--muted); font-size: 13px; }
+    .copy-modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 200; display: none; align-items: flex-end;
+    }
+    .copy-modal-overlay.open { display: flex; }
+    .copy-modal {
+      background: var(--surface); border-radius: 20px 20px 0 0;
+      padding: 20px 20px calc(var(--safe-bottom) + 20px);
+      width: 100%; max-height: 70dvh;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .copy-modal h2 { font-size: 17px; font-weight: 700; }
+    .copy-textarea {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px; color: var(--text);
+      font-size: 12px; font-family: 'Menlo', monospace;
+      resize: none; height: 200px; outline: none;
+      line-height: 1.6;
+    }
+    .copy-btns { display: flex; gap: 10px; }
+    .copy-btn {
+      flex: 1; padding: 12px; border-radius: 10px;
+      border: 1px solid var(--border); background: var(--surface2);
+      color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer;
+    }
+    .copy-btn.primary { background: var(--accent); color: #000; border-color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <h1>Budget</h1>
+    <div class="month-nav">
+      <button onclick="changeMonth(-1)">‹</button>
+      <span class="month-label" id="monthLabel"></span>
+      <button onclick="changeMonth(1)">›</button>
+    </div>
+  </div>
+  <div class="summary">
+    <div class="summary-item">
+      <div class="label">Income</div>
+      <div class="value positive" id="summaryIncome">$0</div>
+    </div>
+    <div class="summary-item">
+      <div class="label">Extra</div>
+      <div class="value blue" id="summaryExtra">$0</div>
+    </div>
+    <div class="summary-item">
+      <div class="label">Bills</div>
+      <div class="value negative" id="summaryBills">$0</div>
+    </div>
+    <div class="summary-item">
+      <div class="label">Savings</div>
+      <div class="value positive" id="summarySavings">$0</div>
+    </div>
+  </div>
+</div>
+
+<div class="content" id="weeksContainer"></div>
+
+<div class="bottom-nav">
+  <button class="nav-btn" onclick="addWeek()">+ Week</button>
+  <button class="nav-btn" onclick="openCopy()">Copy</button>
+  <button class="nav-btn" onclick="openSettings()">Settings</button>
+  <button class="nav-btn primary" onclick="saveData()">Save</button>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>Settings</h2>
+    <div class="section-label">Defaults</div>
+    <div class="modal-row">
+      <label>Default paycheck</label>
+      <input type="number" id="defaultPaycheck" placeholder="1307.24" />
+    </div>
+    <div class="modal-row">
+      <label>Weekly savings target</label>
+      <input type="number" id="defaultSavings" placeholder="250" />
+    </div>
+    <div class="section-label">Starting buffer (Ally balance)</div>
+    <div class="modal-row">
+      <label>This month's starting balance</label>
+      <input type="number" id="startingBuffer" placeholder="567.37" />
+    </div>
+    <button class="modal-close" onclick="closeSettings()">Done</button>
+  </div>
+</div>
+
+<!-- Copy Modal -->
+<div class="copy-modal-overlay" id="copyModal">
+  <div class="copy-modal">
+    <h2>Copy breakdown</h2>
+    <textarea class="copy-textarea" id="copyText" readonly></textarea>
+    <div class="copy-btns">
+      <button class="copy-btn" onclick="closeCopy()">Close</button>
+      <button class="copy-btn primary" onclick="copyToClipboard()">Copy to clipboard</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── STATE ──────────────────────────────────────────────────────────────────
+  let currentMonth = new Date().getMonth();
+  let currentYear = new Date().getFullYear();
+  let settings = { defaultPaycheck: 1307.24, defaultSavings: 250, startingBuffer: 567.37 };
+  let months = {};
+
+  function monthKey() { return `${currentYear}-${currentMonth}`; }
+  function getMonth() {
+    if (!months[monthKey()]) months[monthKey()] = { weeks: [] };
+    return months[monthKey()];
+  }
+
+  // ── DEFAULT DATA ──────────────────────────────────────────────────────────
+  function seedDefaultData() {
+    // June 2026
+    months['2026-5'] = { weeks: [
+      {
+        paycheck: 1307.24, supplemental: 0, open: false,
+        label: 'Jun 12',
+        items: [
+          { name: 'Delta Sky Gold (to 30%)', amount: 851.00, type: 'bill' }
+        ]
+      },
+      {
+        paycheck: 1307.00, supplemental: 0, open: false,
+        label: 'Jun 19',
+        items: [
+          { name: 'Apple Card (full)', amount: 236.55, type: 'bill' },
+          { name: 'Discover (minimum)', amount: 65.68, type: 'bill' }
+        ]
+      },
+      {
+        paycheck: 1307.00, supplemental: 0, open: false,
+        label: 'Jun 26',
+        items: [
+          { name: 'July Rent', amount: 1475.00, type: 'bill' },
+          { name: 'Verizon', amount: 110.00, type: 'bill' }
+        ]
+      }
+    ]};
+
+    // July 2026
+    months['2026-6'] = { weeks: [
+      {
+        paycheck: 1307.00, supplemental: 0, open: false,
+        label: 'Jul 3',
+        items: [
+          { name: 'Amex Gold (full)', amount: 1513.38, type: 'bill' },
+          { name: 'IRS Federal', amount: 426.00, type: 'bill' },
+          { name: 'IRS State', amount: 305.00, type: 'bill' },
+          { name: 'Living expenses', amount: 160.00, type: 'bill' }
+        ]
+      },
+      {
+        paycheck: 1307.00, supplemental: 0, open: false,
+        label: 'Jul 10',
+        items: [
+          { name: 'Affirm', amount: 619.84, type: 'bill' },
+          { name: 'Living expenses', amount: 160.00, type: 'bill' },
+          { name: 'Savings', amount: 250.00, type: 'savings' }
+        ]
+      },
+      {
+        paycheck: 1307.00, supplemental: 0, open: false,
+        label: 'Jul 17',
+        items: [
+          { name: 'Living expenses', amount: 160.00, type: 'bill' },
+          { name: 'Discover', amount: 500.00, type: 'bill' },
+          { name: 'Savings', amount: 250.00, type: 'savings' }
+        ]
+      },
+      {
+        paycheck: 1307.00, supplemental: 0, open: false,
+        label: 'Jul 24',
+        items: [
+          { name: 'Verizon', amount: 110.00, type: 'bill' },
+          { name: 'Delta Sky Gold', amount: 400.00, type: 'bill' },
+          { name: 'Savings', amount: 250.00, type: 'savings' }
+        ]
+      },
+      {
+        paycheck: 1307.00, supplemental: 0, open: false,
+        label: 'Jul 31',
+        items: [
+          { name: 'August Rent', amount: 1475.00, type: 'bill' },
+          { name: 'Savings', amount: 250.00, type: 'savings' }
+        ]
+      }
+    ]};
+  }
+
+  // ── PERSISTENCE ───────────────────────────────────────────────────────────
+  function saveData() {
+    collectFromDOM();
+    try {
+      localStorage.setItem('budget_months', JSON.stringify(months));
+      localStorage.setItem('budget_settings', JSON.stringify(settings));
+      showToast('Saved ✓');
+    } catch(e) { showToast('Save failed'); }
+  }
+
+  function loadData() {
+    try {
+      const m = localStorage.getItem('budget_months');
+      const s = localStorage.getItem('budget_settings');
+      if (m) { months = JSON.parse(m); return; }
+      if (s) settings = { ...settings, ...JSON.parse(s) };
+    } catch(e) {}
+    // First load — seed defaults
+    seedDefaultData();
+  }
+
+  // ── COLLECT FROM DOM ──────────────────────────────────────────────────────
+  function collectFromDOM() {
+    const cards = document.querySelectorAll('.week-card');
+    const data = getMonth();
+    data.weeks = [];
+    cards.forEach(card => {
+      const wIdx = parseInt(card.dataset.week);
+      const paycheck = parseFloat(card.querySelector('.paycheck-input').value) || 0;
+      const supplemental = parseFloat(card.querySelector('.supplemental-input').value) || 0;
+      const label = card.querySelector('.week-date-input') ? card.querySelector('.week-date-input').value : '';
+      const items = [];
+      card.querySelectorAll('.item-row').forEach(row => {
+        const name = row.querySelector('.item-name').value.trim();
+        const amount = parseFloat(row.querySelector('.item-amount').value) || 0;
+        const type = row.querySelector('.item-type').dataset.type;
+        if (name || amount) items.push({ name, amount, type });
+      });
+      data.weeks[wIdx] = { paycheck, supplemental, label, items, open: card.classList.contains('open') };
+    });
+  }
+
+  // ── BUFFER CALC ───────────────────────────────────────────────────────────
+  function calcBufferIn(weekIndex) {
+    const data = getMonth();
+    let buf = settings.startingBuffer || 0;
+    for (let i = 0; i < weekIndex; i++) {
+      const w = data.weeks[i];
+      if (!w) continue;
+      const spent = (w.items || []).reduce((s, it) => s + (it.amount || 0), 0);
+      buf = buf + (w.paycheck || 0) + (w.supplemental || 0) - spent;
+    }
+    return buf;
+  }
+
+  function calcWeekRemaining(week, bufferIn) {
+    const total = (week.paycheck || 0) + (week.supplemental || 0) + bufferIn;
+    const spent = (week.items || []).reduce((s, it) => s + (it.amount || 0), 0);
+    return total - spent;
+  }
+
+  // ── FORMAT ────────────────────────────────────────────────────────────────
+  function fmt(n) {
+    const abs = Math.abs(n);
+    const str = abs.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (n < 0 ? '-$' : '$') + str;
+  }
+
+  // ── RENDER ────────────────────────────────────────────────────────────────
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  function renderAll() {
+    const data = getMonth();
+    document.getElementById('monthLabel').textContent = `${MONTHS[currentMonth]} ${currentYear}`;
+    const container = document.getElementById('weeksContainer');
+    if (!data.weeks.length) {
+      container.innerHTML = '<div class="empty-state">No weeks yet — tap + Week to start</div>';
+      updateSummary([]);
+      return;
+    }
+    container.innerHTML = '';
+    data.weeks.forEach((week, i) => renderWeek(week, i, container));
+    updateSummary(data.weeks);
+  }
+
+  function renderWeek(week, index, container) {
+    const bufferIn = calcBufferIn(index);
+    const remaining = calcWeekRemaining(week, bufferIn);
+    const remClass = remaining >= 400 ? 'ok' : remaining >= 0 ? 'warn' : 'danger';
+    const totalIn = (week.paycheck || 0) + (week.supplemental || 0) + bufferIn;
+
+    const card = document.createElement('div');
+    card.className = 'week-card' + (week.open ? ' open' : '');
+    card.dataset.week = index;
+
+    card.innerHTML = `
+      <div class="week-header" onclick="toggleWeek(${index})">
+        <div class="week-left">
+          <div class="week-title">Week ${index + 1} <span class="week-date">${week.label || ''}</span></div>
+          <div class="week-paycheck">${fmt((week.paycheck||0) + (week.supplemental||0))}</div>
+        </div>
+        <div class="week-right">
+          <div class="week-remaining-label">Buffer after</div>
+          <div class="week-remaining ${remClass}">${fmt(remaining)}</div>
+          <span class="chevron">▼</span>
+        </div>
+      </div>
+      <div class="week-body">
+        <div class="paycheck-row">
+          <label>Paycheck</label>
+          <input class="paycheck-input" type="number" value="${week.paycheck || ''}" placeholder="${settings.defaultPaycheck}" oninput="refreshWeek(${index})" />
+        </div>
+        <div class="supplemental-row">
+          <label>+ Extra income</label>
+          <input class="supplemental-input" type="number" value="${week.supplemental || ''}" placeholder="0.00" oninput="refreshWeek(${index})" />
+        </div>
+        <div class="buffer-row">
+          <label>Buffer coming in</label>
+          <span class="buffer-value">${fmt(bufferIn)}</span>
+        </div>
+        <div class="buffer-row" style="border-bottom:1px solid var(--border)">
+          <label style="font-size:11px;color:var(--muted)">Week date label</label>
+          <input class="week-date-input" type="text" value="${week.label || ''}" placeholder="e.g. Jul 3" style="background:transparent;border:none;color:var(--muted);font-size:12px;text-align:right;width:80px;outline:none;font-family:var(--font)" oninput="refreshWeek(${index})" />
+        </div>
+        <div class="items-list" id="items-${index}">
+          ${(week.items || []).map((item, ii) => renderItemHTML(index, ii, item)).join('')}
+        </div>
+        <div class="add-row">
+          <button class="add-btn" onclick="addItem(${index}, 'bill')">+ Bill</button>
+          <button class="add-btn savings-btn" onclick="addItem(${index}, 'savings')">+ Savings</button>
+          <button class="add-btn" onclick="addItem(${index}, 'buffer')">+ Buffer</button>
+        </div>
+        <div class="week-totals" id="totals-${index}">
+          ${renderTotalsHTML(week, bufferIn)}
+        </div>
+        <div class="week-delete-row">
+          <button class="week-delete-btn" onclick="deleteWeek(${index})">Remove week</button>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  }
+
+  function renderItemHTML(weekIdx, itemIdx, item) {
+    const typeLabels = { bill: 'Bill', savings: 'Save', buffer: 'Buffer' };
+    return `
+      <div class="item-row" data-item="${itemIdx}">
+        <button class="item-type ${item.type}" data-type="${item.type}" onclick="cycleType(${weekIdx}, ${itemIdx})">${typeLabels[item.type] || 'Bill'}</button>
+        <input class="item-name" type="text" value="${escHtml(item.name || '')}" placeholder="Description" oninput="refreshWeek(${weekIdx})" />
+        <input class="item-amount" type="number" value="${item.amount || ''}" placeholder="0.00" oninput="refreshWeek(${weekIdx})" />
+        <button class="delete-btn" onclick="deleteItem(${weekIdx}, ${itemIdx})">×</button>
+      </div>
+    `;
+  }
+
+  function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function renderTotalsHTML(week, bufferIn) {
+    const bills = (week.items || []).filter(i => i.type === 'bill').reduce((s, i) => s + i.amount, 0);
+    const savings = (week.items || []).filter(i => i.type === 'savings').reduce((s, i) => s + i.amount, 0);
+    const bufferSet = (week.items || []).filter(i => i.type === 'buffer').reduce((s, i) => s + i.amount, 0);
+    const total = bills + savings + bufferSet;
+    const totalIn = (week.paycheck || 0) + (week.supplemental || 0) + bufferIn;
+    const remaining = totalIn - total;
+    const remClass = remaining >= 400 ? 'ok' : remaining >= 0 ? 'warn' : 'danger';
+
+    return `
+      <div class="total-row"><span class="tl">Paycheck</span><span class="tv positive">${fmt(week.paycheck||0)}</span></div>
+      ${(week.supplemental||0) > 0 ? `<div class="total-row"><span class="tl">Extra income</span><span class="tv" style="color:var(--blue)">${fmt(week.supplemental)}</span></div>` : ''}
+      <div class="total-row"><span class="tl">Buffer in</span><span class="tv">${fmt(bufferIn)}</span></div>
+      <div class="total-row"><span class="tl">Bills</span><span class="tv negative">−${fmt(bills)}</span></div>
+      <div class="total-row"><span class="tl">Savings</span><span class="tv positive">−${fmt(savings)}</span></div>
+      ${bufferSet ? `<div class="total-row"><span class="tl">Buffer set aside</span><span class="tv">−${fmt(bufferSet)}</span></div>` : ''}
+      <div class="total-row main"><span class="tl">Remaining buffer</span><span class="tv ${remClass}">${fmt(remaining)}</span></div>
+    `;
+  }
+
+  function updateSummary(weeks) {
+    let income = 0, extra = 0, bills = 0, sav = 0;
+    weeks.forEach(w => {
+      income += w.paycheck || 0;
+      extra += w.supplemental || 0;
+      bills += (w.items || []).filter(i => i.type === 'bill').reduce((s, i) => s + i.amount, 0);
+      sav += (w.items || []).filter(i => i.type === 'savings').reduce((s, i) => s + i.amount, 0);
+    });
+    document.getElementById('summaryIncome').textContent = fmt(income);
+    document.getElementById('summaryExtra').textContent = fmt(extra);
+    document.getElementById('summaryBills').textContent = fmt(bills);
+    document.getElementById('summarySavings').textContent = fmt(sav);
+  }
+
+  // ── INTERACTIONS ──────────────────────────────────────────────────────────
+  function toggleWeek(index) {
+    collectFromDOM();
+    getMonth().weeks[index].open = !getMonth().weeks[index].open;
+    renderAll();
+  }
+
+  function refreshWeek(weekIndex) {
+    collectFromDOM();
+    const data = getMonth();
+    const container = document.getElementById('weeksContainer');
+    container.innerHTML = '';
+    data.weeks.forEach((week, i) => renderWeek(week, i, container));
+    updateSummary(data.weeks);
+  }
+
+  function addWeek() {
+    collectFromDOM();
+    getMonth().weeks.push({
+      paycheck: settings.defaultPaycheck,
+      supplemental: 0,
+      label: '',
+      items: [{ name: 'Savings', amount: settings.defaultSavings, type: 'savings' }],
+      open: true
+    });
+    renderAll();
+    setTimeout(() => {
+      const cards = document.querySelectorAll('.week-card');
+      cards[cards.length-1].scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+
+  function deleteWeek(index) {
+    collectFromDOM();
+    getMonth().weeks.splice(index, 1);
+    renderAll();
+  }
+
+  function addItem(weekIndex, type) {
+    collectFromDOM();
+    getMonth().weeks[weekIndex].items.push({ name: '', amount: 0, type });
+    getMonth().weeks[weekIndex].open = true;
+    renderAll();
+    setTimeout(() => {
+      const card = document.querySelector(`[data-week="${weekIndex}"]`);
+      const rows = card.querySelectorAll('.item-row');
+      const last = rows[rows.length - 1];
+      if (last) last.querySelector('.item-name').focus();
+    }, 50);
+  }
+
+  function deleteItem(weekIndex, itemIndex) {
+    collectFromDOM();
+    getMonth().weeks[weekIndex].items.splice(itemIndex, 1);
+    getMonth().weeks[weekIndex].open = true;
+    renderAll();
+  }
+
+  function cycleType(weekIndex, itemIndex) {
+    collectFromDOM();
+    const types = ['bill', 'savings', 'buffer'];
+    const item = getMonth().weeks[weekIndex].items[itemIndex];
+    item.type = types[(types.indexOf(item.type) + 1) % types.length];
+    getMonth().weeks[weekIndex].open = true;
+    renderAll();
+  }
+
+  function changeMonth(dir) {
+    collectFromDOM();
+    currentMonth += dir;
+    if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+    if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+    renderAll();
+  }
+
+  // ── SETTINGS ──────────────────────────────────────────────────────────────
+  function openSettings() {
+    document.getElementById('defaultPaycheck').value = settings.defaultPaycheck || '';
+    document.getElementById('defaultSavings').value = settings.defaultSavings || '';
+    document.getElementById('startingBuffer').value = settings.startingBuffer || '';
+    document.getElementById('settingsModal').classList.add('open');
+  }
+
+  function closeSettings() {
+    settings.defaultPaycheck = parseFloat(document.getElementById('defaultPaycheck').value) || 1307.24;
+    settings.defaultSavings = parseFloat(document.getElementById('defaultSavings').value) || 250;
+    settings.startingBuffer = parseFloat(document.getElementById('startingBuffer').value) || 0;
+    document.getElementById('settingsModal').classList.remove('open');
+    renderAll();
+  }
+
+  // ── COPY / EXPORT ─────────────────────────────────────────────────────────
+  function openCopy() {
+    collectFromDOM();
+    const data = getMonth();
+    const lines = [];
+    lines.push(`${MONTHS[currentMonth]} ${currentYear} — Budget Breakdown`);
+    lines.push('='.repeat(40));
+
+    data.weeks.forEach((week, i) => {
+      const bufferIn = calcBufferIn(i);
+      const remaining = calcWeekRemaining(week, bufferIn);
+      lines.push('');
+      lines.push(`Week ${i+1}${week.label ? ' ('+week.label+')' : ''}`);
+      lines.push(`  Paycheck:       ${fmt(week.paycheck||0)}`);
+      if ((week.supplemental||0) > 0) lines.push(`  Extra income:   ${fmt(week.supplemental)}`);
+      lines.push(`  Buffer in:      ${fmt(bufferIn)}`);
+      lines.push('  ---');
+      (week.items||[]).forEach(item => {
+        const label = item.type === 'savings' ? '[SAVE]' : item.type === 'buffer' ? '[BUF]' : '[BILL]';
+        lines.push(`  ${label} ${item.name.padEnd(22)} ${fmt(item.amount)}`);
+      });
+      lines.push('  ---');
+      lines.push(`  Buffer after:   ${fmt(remaining)}`);
+    });
+
+    lines.push('');
+    lines.push('='.repeat(40));
+    let income=0, extra=0, bills=0, sav=0;
+    data.weeks.forEach(w => {
+      income += w.paycheck||0;
+      extra += w.supplemental||0;
+      bills += (w.items||[]).filter(i=>i.type==='bill').reduce((s,i)=>s+i.amount,0);
+      sav += (w.items||[]).filter(i=>i.type==='savings').reduce((s,i)=>s+i.amount,0);
+    });
+    lines.push(`Total income:     ${fmt(income)}`);
+    if (extra > 0) lines.push(`Total extra:      ${fmt(extra)}`);
+    lines.push(`Total bills:      ${fmt(bills)}`);
+    lines.push(`Total savings:    ${fmt(sav)}`);
+
+    document.getElementById('copyText').value = lines.join('\n');
+    document.getElementById('copyModal').classList.add('open');
+  }
+
+  function closeCopy() {
+    document.getElementById('copyModal').classList.remove('open');
+  }
+
+  function copyToClipboard() {
+    const ta = document.getElementById('copyText');
+    ta.select();
+    try {
+      navigator.clipboard.writeText(ta.value).then(() => {
+        showToast('Copied ✓');
+        closeCopy();
+      }).catch(() => {
+        document.execCommand('copy');
+        showToast('Copied ✓');
+        closeCopy();
+      });
+    } catch(e) {
+      document.execCommand('copy');
+      showToast('Copied ✓');
+      closeCopy();
+    }
+  }
+
+  // ── TOAST ─────────────────────────────────────────────────────────────────
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  // ── INIT ──────────────────────────────────────────────────────────────────
+  loadData();
+  renderAll();
+</script>
+</body>
+</html>
